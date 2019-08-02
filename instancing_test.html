@@ -1,0 +1,174 @@
+﻿<meta charset="UTF-8">
+<html>
+
+<head>
+	<title>oxDNA three.js viewer</title>
+	<style>
+		/*CSS*/
+
+		body {
+			padding: 0;
+			margin: 0;
+			overflow: hidden;
+		}
+		canvas {
+			position: absolute;
+			height: 100%;
+		}
+		.opts {
+			width: 200px;
+			position: fixed;
+			z-index: 1;
+			background-color: #eee;
+			padding: 2px;
+		}
+
+		.sidenav { /*side bar settings*/
+			width: 200px;
+			max-height: 100%;
+			position: fixed;
+			z-index: 1;
+			font-size: 12px;
+			right: 0;
+			text-align: left;
+			overflow-y: scroll;
+			background-color: #eee;
+			opacity: 0.9;
+			padding: 2px;
+		}
+
+		.tab { /*tab settings*/
+			overflow: auto;
+			border: 1px thin #ccc;
+			background-color: #acc;
+		}
+
+		.tab button {
+			margin: 2px;
+			background-color: inherit;
+			border: none;
+			cursor: pointer;
+			padding: 5px; /*on each side of button*/
+			transition: 0.3s;
+			font-size: 17px;
+			float: left;
+			width: auto;
+		}
+
+		.tab button:hover {
+			background-color: azure;
+		}
+
+		.tab button.active {
+			background-color: azure;
+			font-size: 17px;
+		}
+
+		textarea {
+			width: 100%;
+			max-width: 100%;
+			min-width: 100%;
+			overflow-y: scroll;
+			font-size: 12px;
+		}
+
+		button {
+			width: 100%;
+			margin: 2px 0px;
+		}
+
+		input[type=number] {
+			width: 80px;
+		}
+
+	</style>
+    </head>
+
+<body>
+	<div class="sidenav">
+		<!--sidebar-->
+		<div class="tab">
+			<!--2 tabs: Nucleotides. Strands(not used)-->
+			<button class="tablinks active" onclick="openTab(event, 'Nucleotides')">Bases</button>
+			<button class="tablinks" onclick="openTab(event, 'Strands')">Strands</button>
+		</div>
+		<div id="Nucleotides" class="tabcontent">
+			<!--in "Nucloetides" tab-->
+			<textarea id="BaseList" cols="25" rows="3" name="textarea" readonly> Selected Bases List </textarea>
+			<button onclick="makeSelectedBasesFile()" type="button">Download Selected Base List</button>
+			<button onclick="makeMutualTrapFile()" type="button">Make Mutual Trap File(broken!)</button>
+			Resolution: <input id="resolution" onchange="setResolution(this.value)" type="number" min="1" value="10" width="3">
+			<button onclick="makeOutputFiles()" type="button">Download Output Files<br>(.dat and .top)</button>
+			<button onclick="toggleVideoOptions()" type="button">Create Video</button>
+			<button onclick="toggleColorOptions()" type="button">Edit Colors</button>
+			<button onclick="controls.reset()" type="button">Reset Camera</button>
+			<input type="checkbox" id="centering" onchange="centerSystems()">Center Systems
+			<br>
+			<input type="checkbox" id="arrowToggle" onchange="toggleArrows(this)" checked>Display Arrows
+			<br>
+			<input type="checkbox" id="lutToggle" onchange="toggleLut(this)">Display Alternate Colors
+			<br>
+			<input type="checkbox" id="backgroundToggle" onchange="toggleBackground()">Toggle Background Color
+			<fieldset>
+				<legend>Action:</legend>
+				<input type="checkbox" name="action" value="Select" checked> Select <br>
+				<input type="checkbox" name="action" value="Drag" onchange="drag()"> Drag
+			</fieldset>
+			<fieldset>
+				<legend>Selection mode:</legend>
+				<input type="radio" name="scope" value="Nuc" onclick="setScopeMode()" checked>Nucleotide<br> <!--default mode is Nucleotide-->
+				<input type="radio" name="scope" value="Strand" onclick="setScopeMode()">Strand<br>
+				<input type="radio" name="scope" value="System" onclick="setScopeMode()">System
+			</fieldset>
+			<textarea id="BaseInfo" cols="25" rows="10" name="textarea" readonly> Selected Base Information </textarea>
+			<fieldset>
+				<legend>Rotate:</legend>
+				<input type="radio" name="rotate" value="X" onclick="setAxisMode()" checked>X Axis <!--default checked is x-axis-->
+				<br>
+				<input type="radio" name="rotate" value="Y" onclick="setAxisMode()">Y Axis
+				<br>
+				<input type="radio" name="rotate" value="Z" onclick="setAxisMode()">Z Axis
+				<br>
+				Rotation angle:
+				<input type="number" value="-90" id="rotAngle" onchange="setAngle()" width="20">
+				<button onclick="rotate()">Rotate</button>
+			</fieldset>
+			<button onclick="previousConfig()"type="button" style="width: 45%; left: 0" title="'b' on the keyboard"> Prev Config</button>
+			<button onclick="nextConfig()" type="button" style="width: 45%; right: 0; float: right" title="'n' on the keyboard">Next Config</button>
+			</div>
+			<div id="Strands" class="tabcontent" style="display: none">
+				<button>TEST</button>
+			</div>
+			<button onclick="toggleSideNav(this)"type="button" style="background-color: #acc; border: 0px;">hide</button>
+		</div>
+		<div class="opts" id="videoOptions" hidden="hidden">
+			Video type
+			<select id="videoType">
+				<option value="trajectory">Trajectory</option>
+				<option value="lemniscate">XY leminiscate</option>
+			</select>
+			<fieldset>
+				<legend>File format:</legend>
+				<input type="radio" name="videoFormat" value="webm" checked>webm<br>
+				<input type="radio" name="videoFormat" value="gif" >gif<br>
+				<input type="radio" name="videoFormat" value="png" >png<br>
+				<input type="radio" name="videoFormat" value="jpg" >jpg<br>
+			</fieldset>
+			<input type="number" value="24" id="videoFramerate" width="20">framerate
+			<button id="videoStartStop" onclick="createVideo()">Start</button>
+		</div>
+		<div title="Click a color to edit, right click to remove" class="opts"
+			id="colorOptions" hidden="hidden" style="background-color: transparent">
+		</div>
+		<canvas id="threeCanvas"></canvas>
+		<div class="main"> <!--all files to be loaded onload of html file-->
+			<script src="./ts/lib/three.js"></script>
+			<script src="./ts/controls/TrackballControls.js"></script>
+			<script src="./dist/instancing_test.js"></script>
+			
+			<!--<script src="./dist/cubes.js"></script> //for practice/simple model manipulation: cubes.js class-->
+		</div>
+
+</body>
+
+</html>
